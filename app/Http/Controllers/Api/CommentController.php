@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use App\Http\Resources\CommentResource;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use App\Events\CommentCreated;
+use Illuminate\Support\Facades\Log;
 
 /**
  * @OA\Tag(
@@ -127,6 +129,11 @@ class CommentController extends Controller
      */
     public function store(Request $request, News $news): JsonResponse
     {
+        Log::info('Создание комментария через API', [
+            'news_id' => $news->id,
+            'user_id' => $request->user()->id
+        ]);
+
         $validated = $request->validate([
             'content' => 'required|string',
             'parent_id' => 'nullable|exists:comments,id',
@@ -137,6 +144,19 @@ class CommentController extends Controller
             'user_id' => $request->user()->id,
             'parent_id' => $validated['parent_id'] ?? null,
             'is_approved' => true,
+        ]);
+
+        Log::info('Комментарий создан через API', [
+            'comment_id' => $comment->id,
+            'news_id' => $news->id,
+            'user_id' => $request->user()->id
+        ]);
+
+        // Инициируем событие создания комментария
+        event(new CommentCreated($comment));
+
+        Log::info('Событие CommentCreated отправлено через API', [
+            'comment_id' => $comment->id
         ]);
 
         return response()->json([

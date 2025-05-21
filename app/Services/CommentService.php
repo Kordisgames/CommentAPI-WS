@@ -6,18 +6,34 @@ use App\Models\News;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Log;
 
 class CommentService
 {
     public function create(array $data, User $user, News $news): Comment
     {
+        Log::info('Создание комментария через сервис', [
+            'news_id' => $news->id,
+            'user_id' => $user->id
+        ]);
+
         $comment = new Comment($data);
         $comment->user()->associate($user);
         $comment->news()->associate($news);
         $comment->save();
 
+        Log::info('Комментарий создан через сервис', [
+            'comment_id' => $comment->id,
+            'news_id' => $news->id,
+            'user_id' => $user->id
+        ]);
+
         // Отправляем событие о создании комментария
         event(new \App\Events\CommentCreated($comment));
+
+        Log::info('Событие CommentCreated отправлено через сервис', [
+            'comment_id' => $comment->id
+        ]);
 
         return $comment;
     }

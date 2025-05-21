@@ -3,42 +3,26 @@
 namespace App\Events;
 
 use App\Models\Comment;
-use Illuminate\Broadcasting\Channel;
-use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PresenceChannel;
-use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
-class CommentCreated implements ShouldBroadcast
+class CommentCreated
 {
-    use Dispatchable, InteractsWithSockets, SerializesModels;
+    use Dispatchable, SerializesModels;
+
+    public $comment;
 
     /**
      * Create a new event instance.
      */
-    public function __construct(public Comment $comment)
+    public function __construct(Comment $comment)
     {
-        //
-    }
-
-    /**
-     * Get the channels the event should broadcast on.
-     *
-     * @return array<int, \Illuminate\Broadcasting\Channel>
-     */
-    public function broadcastOn(): array
-    {
-        return [
-            new Channel('news.' . $this->comment->news_id),
-        ];
-    }
-
-    public function broadcastWith(): array
-    {
-        return [
-            'comment' => $this->comment->load(['user', 'news']),
-        ];
+        $this->comment = $comment;
+        Log::info('CommentCreated event constructed', [
+            'comment_id' => $comment->id,
+            'news_id' => $comment->news_id,
+            'user_id' => $comment->user_id
+        ]);
     }
 }

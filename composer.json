@@ -15,7 +15,8 @@
         "laravel/sanctum": "^4.1",
         "laravel/tinker": "^2.10.1",
         "predis/predis": "^3.0",
-        "sentry/sentry-laravel": "^4.13"
+        "sentry/sentry-laravel": "^4.13",
+        "workerman/workerman": "^5.1"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
