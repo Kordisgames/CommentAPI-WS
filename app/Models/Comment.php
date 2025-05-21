@@ -18,7 +18,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *     @OA\Property(property="user_id", type="integer", format="int64"),
  *     @OA\Property(property="news_id", type="integer", format="int64"),
  *     @OA\Property(property="parent_id", type="integer", format="int64", nullable=true),
- *     @OA\Property(property="rating", type="integer"),
  *     @OA\Property(property="is_approved", type="boolean"),
  *     @OA\Property(property="created_at", type="string", format="date-time"),
  *     @OA\Property(property="updated_at", type="string", format="date-time"),
@@ -46,14 +45,23 @@ class Comment extends Model
         'user_id',
         'news_id',
         'parent_id',
-        'rating',
         'is_approved',
     ];
 
     protected $casts = [
-        'rating' => 'integer',
         'is_approved' => 'boolean',
     ];
+
+    /**
+     * Scope a query to only include approved comments.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeApproved($query)
+    {
+        return $query->where('is_approved', true);
+    }
 
     public function user(): BelongsTo
     {

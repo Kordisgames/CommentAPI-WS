@@ -23,10 +23,10 @@ function routeApi(): void
     // Маршруты для комментариев
     Route::get('/news/{news}/comments', [CommentController::class, 'index']);
     Route::post('/news/{news}/comments', [CommentController::class, 'store']);
+    Route::get('/comments/search', [CommentController::class, 'search']);
     Route::get('/comments/{comment}', [CommentController::class, 'show']);
     Route::put('/comments/{comment}', [CommentController::class, 'update']);
     Route::delete('/comments/{comment}', [CommentController::class, 'destroy']);
-    Route::get('/comments/search', [CommentController::class, 'search']);
 }
 
 // Регистрируем маршруты API с префиксом v1

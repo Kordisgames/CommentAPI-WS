@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use App\Http\Resources\CommentResource;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 /**
  * @OA\Tag(
@@ -20,6 +21,8 @@ use App\Http\Resources\CommentResource;
  */
 class CommentController extends Controller
 {
+    use AuthorizesRequests;
+
     public function __construct(
         private readonly CommentService $commentService
     ) {
@@ -30,6 +33,7 @@ class CommentController extends Controller
      *     path="/v1/news/{news_id}/comments",
      *     summary="Get list of comments for news",
      *     tags={"Comments"},
+     *     security={{"sanctum":{}}},
      *     @OA\Parameter(
      *         name="news_id",
      *         in="path",
@@ -59,6 +63,10 @@ class CommentController extends Controller
      *             @OA\Property(property="links", type="object"),
      *             @OA\Property(property="meta", type="object")
      *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthenticated"
      *     ),
      *     @OA\Response(
      *         response=404,
@@ -143,6 +151,7 @@ class CommentController extends Controller
      *     path="/v1/comments/{id}",
      *     summary="Get comment by ID",
      *     tags={"Comments"},
+     *     security={{"sanctum":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -156,6 +165,10 @@ class CommentController extends Controller
      *         @OA\JsonContent(
      *             @OA\Property(property="comment", ref="#/components/schemas/Comment")
      *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthenticated"
      *     ),
      *     @OA\Response(
      *         response=404,
@@ -199,8 +212,16 @@ class CommentController extends Controller
      *         )
      *     ),
      *     @OA\Response(
+     *         response=401,
+     *         description="Unauthenticated"
+     *     ),
+     *     @OA\Response(
      *         response=403,
-     *         description="Forbidden"
+     *         description="Forbidden - User can only edit their own comments",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="You are not authorized to update this comment. You can only edit your own comments."),
+     *             @OA\Property(property="error", type="string", example="unauthorized")
+     *         )
      *     ),
      *     @OA\Response(
      *         response=404,
@@ -214,18 +235,25 @@ class CommentController extends Controller
      */
     public function update(Request $request, Comment $comment): JsonResponse
     {
-        $this->authorize('update', $comment);
+        try {
+            $this->authorize('update', $comment);
 
-        $validated = $request->validate([
-            'content' => 'required|string',
-        ]);
+            $validated = $request->validate([
+                'content' => 'required|string',
+            ]);
 
-        $comment->update($validated);
+            $comment->update($validated);
 
-        return response()->json([
-            'message' => 'Comment updated successfully',
-            'comment' => new CommentResource($comment->load(['user', 'news', 'parent', 'replies'])),
-        ]);
+            return response()->json([
+                'message' => 'Comment updated successfully',
+                'comment' => new CommentResource($comment->load(['user', 'news', 'parent', 'replies'])),
+            ]);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return response()->json([
+                'message' => 'You are not authorized to update this comment. You can only edit your own comments.',
+                'error' => 'unauthorized'
+            ], 403);
+        }
     }
 
     /**
@@ -249,8 +277,16 @@ class CommentController extends Controller
      *         )
      *     ),
      *     @OA\Response(
+     *         response=401,
+     *         description="Unauthenticated"
+     *     ),
+     *     @OA\Response(
      *         response=403,
-     *         description="Forbidden"
+     *         description="Forbidden - User can only delete their own comments",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="You are not authorized to delete this comment. You can only delete your own comments."),
+     *             @OA\Property(property="error", type="string", example="unauthorized")
+     *         )
      *     ),
      *     @OA\Response(
      *         response=404,
@@ -260,72 +296,28 @@ class CommentController extends Controller
      */
     public function destroy(Comment $comment): JsonResponse
     {
-        $this->authorize('delete', $comment);
+        try {
+            $this->authorize('delete', $comment);
 
-        $comment->delete();
+            $comment->delete();
 
-        return response()->json([
-            'message' => 'Comment deleted successfully',
-        ]);
-    }
-
-    /**
-     * @OA\Post(
-     *     path="/v1/comments/{id}/rate",
-     *     summary="Rate a comment",
-     *     tags={"Comments"},
-     *     security={{"sanctum":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         description="Comment ID",
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"rating"},
-     *             @OA\Property(property="rating", type="integer", minimum=-1, maximum=1, example=1)
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Comment rated successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Comment rated successfully"),
-     *             @OA\Property(property="comment", ref="#/components/schemas/Comment")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Comment not found"
-     *     ),
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error"
-     *     )
-     * )
-     */
-    public function rate(Request $request, Comment $comment): JsonResponse
-    {
-        $validated = $request->validate([
-            'rating' => 'required|integer|min:-1|max:1',
-        ]);
-
-        $comment->increment('rating', $validated['rating']);
-
-        return response()->json([
-            'message' => 'Comment rated successfully',
-            'comment' => new CommentResource($comment->load(['user', 'news', 'parent', 'replies'])),
-        ]);
+            return response()->json([
+                'message' => 'Comment deleted successfully',
+            ]);
+        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            return response()->json([
+                'message' => 'You are not authorized to delete this comment. You can only delete your own comments.',
+                'error' => 'unauthorized'
+            ], 403);
+        }
     }
 
     /**
      * @OA\Get(
-     *     path="/api/v1/comments/search",
+     *     path="/v1/comments/search",
      *     summary="Search comments",
      *     tags={"Comments"},
+     *     security={{"sanctum":{}}},
      *     @OA\Parameter(
      *         name="query",
      *         in="query",
@@ -358,6 +350,10 @@ class CommentController extends Controller
      *             type="array",
      *             @OA\Items(ref="#/components/schemas/Comment")
      *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthenticated"
      *     )
      * )
      */
