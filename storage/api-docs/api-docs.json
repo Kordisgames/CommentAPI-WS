@@ -817,11 +817,6 @@
                         "example": null,
                         "nullable": true
                     },
-                    "rating": {
-                        "description": "Comment rating",
-                        "type": "integer",
-                        "example": 5
-                    },
                     "is_approved": {
                         "description": "Approval status",
                         "type": "boolean",

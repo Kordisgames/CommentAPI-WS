@@ -136,7 +136,6 @@ class CommentController extends Controller
             'content' => $validated['content'],
             'user_id' => $request->user()->id,
             'parent_id' => $validated['parent_id'] ?? null,
-            'rating' => 0,
             'is_approved' => true,
         ]);
 

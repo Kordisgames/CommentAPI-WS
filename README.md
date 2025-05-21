@@ -10,3 +10,7 @@ php artisan migrate:fresh --seed
 
 ## Start Server
 php artisan serve
+
+## Test Cases
+mysql > "CREATE DATABASE IF NOT EXISTS 7eminar_test;"
+php artisan test tests/Feature/CommentTest.php

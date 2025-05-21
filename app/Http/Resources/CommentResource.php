@@ -44,12 +44,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *         example=null
  *     ),
  *     @OA\Property(
- *         property="rating",
- *         type="integer",
- *         description="Comment rating",
- *         example=5
- *     ),
- *     @OA\Property(
  *         property="is_approved",
  *         type="boolean",
  *         description="Approval status",
@@ -108,7 +102,6 @@ class CommentResource extends JsonResource
             'user_id' => $this->user_id,
             'news_id' => $this->news_id,
             'parent_id' => $this->parent_id,
-            'rating' => $this->rating,
             'is_approved' => $this->is_approved,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

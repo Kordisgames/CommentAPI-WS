@@ -21,121 +21,195 @@ class CommentTest extends TestCase
     {
         parent::setUp();
 
-        // Создаем пользователя и новость для тестов
-        $this->user = User::factory()->create();
-        $this->news = News::factory()->create(['user_id' => $this->user->id]);
+        $email = $this->faker->email;
 
-        // Получаем токен для аутентификации
-        $this->token = $this->user->createToken('test-token')->plainTextToken;
+        // Создаем тестового пользователя
+        $this->user = User::factory()->create([
+            'email' => $email,
+            'password' => bcrypt('11211121')
+        ]);
+
+        // Создаем тестовую новость
+        $this->news = News::factory()->create([
+            'user_id' => $this->user->id,
+            'is_published' => true,
+            'published_at' => now()
+        ]);
+
+        // Получаем токен для авторизации
+        $response = $this->postJson('/v1/auth/login', [
+            'email' => $email,
+            'password' => '11211121'
+        ]);
+
+        $this->token = $response->json('token');
     }
 
-    public function test_can_create_comment(): void
+    /** @test */
+    public function user_can_create_comment()
     {
         $commentData = [
-            'content' => $this->faker->paragraph,
+            'content' => 'Test comment content'
         ];
 
         $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
-            ->postJson("/api/v1/news/{$this->news->id}/comments", $commentData);
+            ->postJson("/v1/news/{$this->news->id}/comments", $commentData);
 
         $response->assertStatus(201)
             ->assertJsonStructure([
-                'id',
-                'content',
-                'user_id',
-                'news_id',
-                'created_at',
-                'updated_at',
-                'user' => [
+                'message',
+                'comment' => [
                     'id',
-                    'name',
-                    'email',
-                ],
+                    'content',
+                    'user_id',
+                    'news_id',
+                    'created_at',
+                    'user' => [
+                        'id',
+                        'name',
+                        'email'
+                    ]
+                ]
             ]);
 
         $this->assertDatabaseHas('comments', [
             'content' => $commentData['content'],
             'user_id' => $this->user->id,
-            'news_id' => $this->news->id,
+            'news_id' => $this->news->id
         ]);
     }
 
-    public function test_can_update_own_comment(): void
+    /** @test */
+    public function user_cannot_create_comment_without_content()
+    {
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+            ->postJson("/v1/news/{$this->news->id}/comments", []);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['content']);
+    }
+
+    /** @test */
+    public function user_can_update_own_comment()
     {
         $comment = Comment::factory()->create([
             'user_id' => $this->user->id,
             'news_id' => $this->news->id,
+            'content' => 'Original content'
         ]);
 
-        $updateData = [
-            'content' => 'Updated comment content',
+        $updatedData = [
+            'content' => 'Updated content'
         ];
 
         $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
-            ->putJson("/api/v1/comments/{$comment->id}", $updateData);
+            ->putJson("/v1/comments/{$comment->id}", $updatedData);
 
         $response->assertStatus(200)
             ->assertJson([
-                'content' => $updateData['content'],
+                'message' => 'Comment updated successfully',
+                'comment' => [
+                    'content' => 'Updated content'
+                ]
             ]);
 
         $this->assertDatabaseHas('comments', [
             'id' => $comment->id,
-            'content' => $updateData['content'],
+            'content' => 'Updated content'
         ]);
     }
 
-    public function test_cannot_update_other_user_comment(): void
+    /** @test */
+    public function user_cannot_update_other_users_comment()
     {
         $otherUser = User::factory()->create();
         $comment = Comment::factory()->create([
             'user_id' => $otherUser->id,
             'news_id' => $this->news->id,
+            'content' => 'Original content'
         ]);
 
-        $updateData = [
-            'content' => 'Updated comment content',
-        ];
-
         $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
-            ->putJson("/api/v1/comments/{$comment->id}", $updateData);
+            ->putJson("/v1/comments/{$comment->id}", [
+                'content' => 'Updated content'
+            ]);
 
-        $response->assertStatus(403);
+        $response->assertStatus(403)
+            ->assertJson([
+                'message' => 'You are not authorized to update this comment. You can only edit your own comments.',
+                'error' => 'unauthorized'
+            ]);
     }
 
-    public function test_can_delete_own_comment(): void
+    /** @test */
+    public function user_can_delete_own_comment()
     {
         $comment = Comment::factory()->create([
             'user_id' => $this->user->id,
-            'news_id' => $this->news->id,
+            'news_id' => $this->news->id
         ]);
 
         $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
-            ->deleteJson("/api/v1/comments/{$comment->id}");
+            ->deleteJson("/v1/comments/{$comment->id}");
 
-        $response->assertStatus(204);
+        $response->assertStatus(200)
+            ->assertJson([
+                'message' => 'Comment deleted successfully'
+            ]);
 
         $this->assertSoftDeleted('comments', [
-            'id' => $comment->id,
+            'id' => $comment->id
         ]);
     }
 
-    public function test_can_search_comments(): void
+    /** @test */
+    public function user_cannot_delete_other_users_comment()
+    {
+        $otherUser = User::factory()->create();
+        $comment = Comment::factory()->create([
+            'user_id' => $otherUser->id,
+            'news_id' => $this->news->id
+        ]);
+
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+            ->deleteJson("/v1/comments/{$comment->id}");
+
+        $response->assertStatus(403)
+            ->assertJson([
+                'message' => 'You are not authorized to delete this comment. You can only delete your own comments.',
+                'error' => 'unauthorized'
+            ]);
+    }
+
+    /** @test */
+    public function user_can_search_comments()
     {
         // Создаем несколько комментариев
-        Comment::factory()->count(3)->create([
+        Comment::factory()->create([
+            'user_id' => $this->user->id,
             'news_id' => $this->news->id,
-            'content' => 'Test comment',
+            'content' => 'Great article about Laravel'
         ]);
 
         Comment::factory()->create([
+            'user_id' => $this->user->id,
             'news_id' => $this->news->id,
-            'content' => 'Different content',
+            'content' => 'Another comment about PHP'
         ]);
 
-        $response = $this->getJson('/api/v1/comments/search?query=Test');
+        // Поиск по слову "Laravel"
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+            ->getJson('/v1/comments/search?query=Laravel');
 
         $response->assertStatus(200)
-            ->assertJsonCount(3, 'data');
+            ->assertJsonCount(1)
+            ->assertJsonFragment(['content' => 'Great article about Laravel']);
+
+        // Поиск по ID пользователя
+        $response = $this->withHeader('Authorization', 'Bearer ' . $this->token)
+            ->getJson("/v1/comments/search?user_id={$this->user->id}");
+
+        $response->assertStatus(200)
+            ->assertJsonCount(2);
     }
 }

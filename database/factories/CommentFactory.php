@@ -26,7 +26,6 @@ class CommentFactory extends Factory
             'user_id' => User::factory(),
             'news_id' => News::factory(),
             'parent_id' => null,
-            'rating' => $this->faker->numberBetween(-10, 10),
             'is_approved' => true,
         ];
     }
